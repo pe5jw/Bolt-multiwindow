@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Venster</title>
+  <title></title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -31,7 +31,33 @@
       flex-shrink: 0;
       overflow: hidden;
       -webkit-app-region: drag;
+      transition: opacity 0.25s ease, transform 0.25s ease;
     }
+
+    /* hide-modus: toolbar zweeft boven de inhoud */
+    body.toolbar-hide #toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-100%);
+      pointer-events: none;
+    }
+    body.toolbar-hide #toolbar.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* hotzone: transparante strook boven in het venster */
+    #hotzone {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      z-index: 200;
+    }
+    body.toolbar-hide #hotzone { display: block; }
 
     #toolbar > * { -webkit-app-region: no-drag; }
 
@@ -101,6 +127,12 @@
       position: relative;
     }
 
+    /* in hide-modus vult iframe het hele venster */
+    body.toolbar-hide #content {
+      position: fixed;
+      inset: 0;
+    }
+
     iframe {
       width: 100%;
       height: 100%;
@@ -113,6 +145,9 @@
   </style>
 </head>
 <body>
+
+  <!-- hotzone voor hide-modus: muis hier → toolbar zichtbaar -->
+  <div id="hotzone"></div>
 
   <div id="toolbar">
 

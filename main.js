@@ -100,12 +100,15 @@ function createWindow(winConfig, appConfig) {
   win.loadFile(path.join(__dirname, 'renderer', 'window-ui.html'))
 
   win.webContents.once('did-finish-load', () => {
+    // Titel opnieuw zetten — HTML <title> overschrijft anders de BrowserWindow title
+    win.setTitle(title)
     win.webContents.send('window-init', {
       id,
       url,
       title,
       toolbarHeight,
       midiEnabled: appConfig.midi?.enabled ?? false,
+      toolbarVisible: appConfig.toolbar?.alwaysVisible ?? true,
     })
   })
 
