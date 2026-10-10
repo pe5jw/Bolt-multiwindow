@@ -1,0 +1,50 @@
+{
+  // ── Vensters ────────────────────────────────────────────────────────────────
+  // Voeg zoveel vensters toe als je wilt. Positie en grootte worden automatisch
+  // opgeslagen wanneer je een venster sluit.
+  "windows": [
+    {
+      "id": "scherm1",        // Uniek ID (geen spaties), gebruikt intern als sleutel
+      "title": "Scherm 1",    // Titel in de titelbalk van het venster
+      "url": "https://...",   // URL die geladen wordt in het venster
+
+      "width": 1280,          // Breedte in pixels
+      "height": 720,          // Hoogte in pixels
+      "x": 0,                 // Beginpositie X (optioneel, weglaten = automatisch)
+      "y": 0,                 // Beginpositie Y (optioneel, weglaten = automatisch)
+
+      // resizable bepaalt of je het venster met de muis kunt vergroten/verkleinen
+      // true  → vrij formaat (standaard)
+      // false → vast formaat, venster kan niet worden aangepast
+      "resizable": true
+    },
+    {
+      "id": "scherm2",
+      "title": "Scherm 2",
+      "url": "https://...",
+      "width": 800,
+      "height": 600,
+      "resizable": false      // Vast formaat venster
+    }
+  ],
+
+  // ── MIDI ────────────────────────────────────────────────────────────────────
+  "midi": {
+    // enabled bepaalt of MIDI-selectors zichtbaar zijn in de toolbar
+    // true  → MIDI in/uit selectors tonen per venster
+    // false → MIDI volledig verbergen (ook als er apparaten zijn)
+    "enabled": true
+  },
+
+  // ── Toolbar ─────────────────────────────────────────────────────────────────
+  "toolbar": {
+    "height": 36,             // Hoogte van de toolbar in pixels (aanbevolen: 32–48)
+
+    // alwaysVisible bepaalt het gedrag van de toolbar
+    // true    → altijd zichtbaar bovenaan het venster (standaard)
+    // "hide"  → verbergt na 2 seconden; verschijnt weer als je met de muis
+    //           naar de bovenkant van het venster gaat
+    // false   → toolbar helemaal weg; iframe vult het hele venster
+    "alwaysVisible": true
+  }
+}
