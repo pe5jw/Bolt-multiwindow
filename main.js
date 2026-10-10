@@ -13,6 +13,20 @@ if (IS_LINUX) {
   // app.commandLine.appendSwitch('ozone-platform', 'x11')
 }
 
+// Sta zelf-ondertekende certificaten toe voor lokale adressen (routers, NAS, etc.)
+// Alleen voor vensters waarvan de URL in config als "allowInsecure": true staat,
+// of wanneer het een privé IP-adres betreft (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  const isLocal = /^https?:\/\/(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/
+    .test(url)
+  if (isLocal) {
+    event.preventDefault()   // fout onderdrukken
+    callback(true)           // certificaat accepteren
+  } else {
+    callback(false)          // externe sites: normaal weigeren
+  }
+})
+
 // ── Config laden uit dezelfde map als de app ──────────────────────────────────
 // app.getAppPath() werkt zowel in dev (map met package.json) als in gebouwde app
 const CONFIG_PATH = path.join(app.getAppPath(), 'config.json')
