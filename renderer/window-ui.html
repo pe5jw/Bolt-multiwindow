@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venster</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      background: #1a1a1a;
+      color: #ddd;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────────────── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      height: var(--toolbar-height, 36px);
+      min-height: var(--toolbar-height, 36px);
+      background: #111;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    #toolbar > * { -webkit-app-region: no-drag; }
+
+    .tb-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 6px;
+      border-right: 1px solid #333;
+      height: 100%;
+    }
+    .tb-group:last-child { border-right: none; }
+
+    .tb-label {
+      color: #888;
+      white-space: nowrap;
+      font-size: 11px;
+    }
+
+    select {
+      background: #222;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-size: 11px;
+      max-width: 140px;
+      cursor: pointer;
+    }
+    select:hover { border-color: #666; }
+    select:focus { outline: 1px solid #4a9eff; border-color: #4a9eff; }
+
+    .midi-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #888;
+      white-space: nowrap;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .midi-pill.active { border-color: #2a6eff; color: #4a9eff; }
+
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+    }
+    .dot.active { background: #4a9eff; animation: pulse 1s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Inhoud iframe ────────────────────────────────────────────────── */
+    #content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* ── Geen MIDI melding ────────────────────────────────────────────── */
+    .no-midi { color: #555; font-size: 11px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div id="toolbar">
+
+    <!-- Audio in -->
+    <div class="tb-group">
+      <span class="tb-label">🎙 In</span>
+      <select id="audio-in" title="Audio invoer apparaat">
+        <option value="">— laden —</option>
+      </select>
+    </div>
+
+    <!-- Audio uit -->
+    <div class="tb-group">
+      <span class="tb-label">🔊 Uit</span>
+      <select id="audio-out" title="Audio uitvoer apparaat">
+        <option value="">— laden —</option>
+      </select>
+    </div>
+
+    <!-- MIDI in -->
+    <div class="tb-group" id="midi-in-group">
+      <span class="tb-label">🎹 In</span>
+      <select id="midi-in" title="MIDI invoer poort">
+        <option value="-1">— geen —</option>
+      </select>
+    </div>
+
+    <!-- MIDI uit -->
+    <div class="tb-group" id="midi-out-group">
+      <span class="tb-label">🎹 Uit</span>
+      <select id="midi-out" title="MIDI uitvoer poort">
+        <option value="-1">— geen —</option>
+      </select>
+    </div>
+
+    <!-- MIDI status -->
+    <div class="tb-group">
+      <div class="midi-pill" id="midi-status">
+        <span class="dot" id="midi-dot"></span>
+        <span id="midi-text">geen MIDI</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="content">
+    <iframe id="frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+  </div>
+
+  <script src="window-ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "windows": [
+    {
+      "id": "scherm1",
+      "url": "https://example.com",
+      "width": 1280,
+      "height": 720,
+      "title": "Scherm 1",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "scherm2",
+      "url": "https://google.com",
+      "width": 800,
+      "height": 600,
+      "title": "Scherm 2",
+      "x": 100,
+      "y": 100
+    }
+  ],
+  "midi": {
+    "enabled": true,
+    "thru": false
+  },
+  "toolbar": {
+    "height": 36,
+    "alwaysVisible": true
+  }
+}
