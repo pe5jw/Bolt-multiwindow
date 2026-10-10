@@ -45,10 +45,26 @@ chmod +x start.sh maak-snelkoppeling.sh
 
 ---
 
+## Meerdere configuraties
+
+Je kunt meerdere config-bestanden naast de app bewaren. Bij het opstarten verschijnt een keuzevenster als er meer dan één config gevonden wordt.
+
+Naamgeving — elk bestand dat begint met `config` en eindigt op `.json` wordt automatisch opgepikt:
+
+```
+config.json           ← standaard opstelling
+config-radio.json     ← radio opstelling
+config-studio.json    ← studio opstelling
+```
+
+Bij **één** config-bestand start de app direct zonder te vragen.
+
+---
+
 ## config.json
 
 Staat **naast de app** (zelfde map als `main.js`).
-Grootte en positie worden automatisch opgeslagen bij het sluiten van een venster.
+Grootte en positie worden automatisch opgeslagen bij het sluiten van een venster in de actieve config.
 Zie `config.example.jsonc` voor een volledig becommentarieerde versie.
 
 ```jsonc

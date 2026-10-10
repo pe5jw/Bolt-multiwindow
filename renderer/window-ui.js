@@ -6,18 +6,55 @@
     window.electron.onInit(resolve)
   })
 
-  const { id: windowId, url, toolbarHeight = 36, midiEnabled = false } = config
+  const { id: windowId, url, toolbarHeight = 36, midiEnabled = false, toolbarVisible = true } = config
 
-  // Toolbar hoogte instellen
-  document.documentElement.style.setProperty('--toolbar-height', toolbarHeight + 'px')
+  // ── Toolbar zichtbaarheid ────────────────────────────────────────────────────
+  // true   → altijd zichtbaar (standaard)
+  // "hide" → verdwijnt na 2 seconden, verschijnt bij hover bovenaan
+  // false  → helemaal weg, iframe vult het hele venster
+  const toolbar = document.getElementById('toolbar')
+
+  if (toolbarVisible === false || toolbarVisible === 'false') {
+    // Helemaal weg
+    toolbar.style.display = 'none'
+  } else {
+    // Zichtbaar (true of "hide")
+    document.documentElement.style.setProperty('--toolbar-height', toolbarHeight + 'px')
+
+    if (toolbarVisible === 'hide') {
+      let hideTimer = setTimeout(() => { toolbar.style.opacity = '0'; toolbar.style.pointerEvents = 'none' }, 2000)
+
+      // Hotzone: muis bovenaan venster
+      const hotzone = document.createElement('div')
+      hotzone.style.cssText = 'position:fixed;top:0;left:0;right:0;height:8px;z-index:200;'
+      document.body.appendChild(hotzone)
+
+      function showToolbar() {
+        toolbar.style.opacity = '1'
+        toolbar.style.pointerEvents = 'auto'
+        clearTimeout(hideTimer)
+      }
+      function scheduleHide() {
+        clearTimeout(hideTimer)
+        hideTimer = setTimeout(() => { toolbar.style.opacity = '0'; toolbar.style.pointerEvents = 'none' }, 2000)
+      }
+
+      toolbar.style.transition = 'opacity 0.25s ease'
+      hotzone.addEventListener('mouseenter', showToolbar)
+      toolbar.addEventListener('mouseenter', showToolbar)
+      toolbar.addEventListener('mouseleave', scheduleHide)
+    }
+  }
 
   // URL laden in iframe
   document.getElementById('frame').src = url
 
   // MIDI-paneel verbergen als MIDI uitgeschakeld is
   if (!midiEnabled) {
-    document.getElementById('midi-in-group').style.display  = 'none'
-    document.getElementById('midi-out-group').style.display = 'none'
+    const ig = document.getElementById('midi-in-group')
+    const og = document.getElementById('midi-out-group')
+    if (ig) ig.style.display = 'none'
+    if (og) og.style.display = 'none'
   }
 
   // ── Audio apparaten ─────────────────────────────────────────────────────────
@@ -28,14 +65,12 @@
   let audioStream = null
 
   async function loadAudioDevices() {
-    // Vraag permissie — nodig om labels te zien
     try {
       const tmp = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       tmp.getTracks().forEach(t => t.stop())
-    } catch { /* geen permissie, toon device-IDs */ }
+    } catch { /* geen permissie */ }
 
     const devices = await navigator.mediaDevices.enumerateDevices()
-
     const inputs  = devices.filter(d => d.kind === 'audioinput')
     const outputs = devices.filter(d => d.kind === 'audiooutput')
 
@@ -51,7 +86,6 @@
   }
 
   async function applyAudio() {
-    // Sluit vorig context
     if (audioStream) audioStream.getTracks().forEach(t => t.stop())
     if (audioCtx)    await audioCtx.close().catch(() => {})
     audioCtx    = null
@@ -60,7 +94,7 @@
     const inId  = audioInSel.value
     const outId = audioOutSel.value
 
-    if (!inId) return   // niets geselecteerd
+    if (!inId) return
 
     try {
       audioStream = await navigator.mediaDevices.getUserMedia({
@@ -68,7 +102,6 @@
         video: false,
       })
 
-      // sinkId API (Chromium 110+) voor uitvoer-selectie
       const ctxOptions = {}
       if (outId && typeof AudioContext !== 'undefined') {
         try { ctxOptions.sinkId = outId } catch {}
@@ -76,7 +109,6 @@
 
       audioCtx = new AudioContext(ctxOptions)
 
-      // Als setSinkId beschikbaar is (nieuwere Electron)
       if (outId && audioCtx.setSinkId) {
         await audioCtx.setSinkId(outId).catch(() => {})
       }
@@ -89,12 +121,10 @@
     }
   }
 
-  audioInSel.addEventListener('change',  applyAudio)
-  audioOutSel.addEventListener('change', applyAudio)
+  if (audioInSel)  audioInSel.addEventListener('change',  applyAudio)
+  if (audioOutSel) audioOutSel.addEventListener('change', applyAudio)
 
   await loadAudioDevices()
-
-  // Apparaten herladen als ze wijzigen (USB in/uitstekken)
   navigator.mediaDevices.addEventListener('devicechange', loadAudioDevices)
 
   // ── MIDI ────────────────────────────────────────────────────────────────────
@@ -111,54 +141,41 @@
       midiStatus.classList.toggle('active', active)
     }
 
-    // Poorten ophalen en selects vullen
     async function loadMidiPorts() {
       const { inputs, outputs } = await window.electron.getMidiPorts()
 
       midiInSel.innerHTML = '<option value="-1">— geen —</option>' +
-        inputs.map((name, i) =>
-          `<option value="${i}">${name}</option>`
-        ).join('')
+        inputs.map((name, i) => `<option value="${i}">${name}</option>`).join('')
 
       midiOutSel.innerHTML = '<option value="-1">— geen —</option>' +
-        outputs.map((name, i) =>
-          `<option value="${i}">${name}</option>`
-        ).join('')
+        outputs.map((name, i) => `<option value="${i}">${name}</option>`).join('')
 
-      if (inputs.length === 0 && outputs.length === 0) {
-        setMidiStatus('geen MIDI apparaten')
-      } else {
-        setMidiStatus(`${inputs.length} in · ${outputs.length} uit`)
-      }
+      setMidiStatus(
+        inputs.length === 0 && outputs.length === 0
+          ? 'geen MIDI apparaten'
+          : `${inputs.length} in · ${outputs.length} uit`
+      )
     }
 
-    // MIDI input wissel
     midiInSel.addEventListener('change', () => {
       const port = parseInt(midiInSel.value, 10)
       window.electron.openMidiInput({ windowId, port })
       if (port === -1) {
-        setMidiStatus(
-          midiOutSel.value !== '-1' ? `uit: ${midiOutSel.options[midiOutSel.selectedIndex].text}` : 'geen MIDI',
-          midiOutSel.value !== '-1'
-        )
+        setMidiStatus(midiOutSel.value !== '-1' ? `uit: ${midiOutSel.options[midiOutSel.selectedIndex].text}` : 'geen MIDI', midiOutSel.value !== '-1')
       } else {
         setMidiStatus(`in: ${midiInSel.options[midiInSel.selectedIndex].text}`, true)
       }
     })
 
-    // MIDI output wissel
     midiOutSel.addEventListener('change', () => {
-      const port = parseInt(midiOutSel.value, 10)
-      window.electron.openMidiOutput({ windowId, port })
+      window.electron.openMidiOutput({ windowId, port: parseInt(midiOutSel.value, 10) })
     })
 
-    // MIDI berichten ontvangen — toon in statuspil
     let midiTimeout = null
     window.electron.onMidi(({ msg }) => {
       const [status, note, velocity] = msg
-      const type    = status >> 4
+      const type = status >> 4
       const channel = (status & 0xf) + 1
-
       let label = ''
       if      (type === 9 && velocity > 0) label = `▶ N${note} v${velocity} ch${channel}`
       else if (type === 8 || (type === 9 && velocity === 0)) label = `■ N${note} ch${channel}`
@@ -166,12 +183,9 @@
       else label = `0x${status.toString(16)} ${note} ${velocity}`
 
       setMidiStatus(label, true)
-
       clearTimeout(midiTimeout)
       midiTimeout = setTimeout(() => {
-        const selText = midiInSel.selectedIndex > 0
-          ? `in: ${midiInSel.options[midiInSel.selectedIndex].text}`
-          : 'geen MIDI'
+        const selText = midiInSel.selectedIndex > 0 ? `in: ${midiInSel.options[midiInSel.selectedIndex].text}` : 'geen MIDI'
         setMidiStatus(selText, midiInSel.selectedIndex > 0)
       }, 1500)
     })
