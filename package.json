@@ -1,20 +1,13 @@
 {
-  "name": "electron-multiwindow",
+  "name": "bolt-multiwindow",
   "version": "1.0.0",
   "description": "Multi-venster Electron app met audio en MIDI per venster",
   "main": "main.js",
   "scripts": {
-    "start":          "electron .",
-    "rebuild":        "electron-rebuild -f -w gifted",
-    "rebuild:win":    "electron-rebuild -f -w gifted --arch x64",
-    "rebuild:linux":  "electron-rebuild -f -w gifted",
-    "install:all":    "npm install && npm run rebuild"
+    "start": "electron ."
   },
   "dependencies": {
-    "gifted": "^1.0.0"
-  },
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-rebuild": "^3.2.9"
+    "@julusian/midi": "^3.6.1",
+    "electron": "^28.0.0"
   }
 }

@@ -35,11 +35,12 @@ function saveConfig(config) {
 }
 
 // ── MIDI setup ────────────────────────────────────────────────────────────────
+// @julusian/midi heeft prebuilds voor Windows/Linux/macOS — geen compileren nodig
 let midi
 try {
-  midi = require('gifted')
+  midi = require('@julusian/midi')
 } catch {
-  console.warn('⚠️  gifted niet gevonden — MIDI uitgeschakeld. Voer "npm install gifted" uit.')
+  console.warn('⚠️  @julusian/midi niet gevonden — MIDI uitgeschakeld. Voer "npm install" uit.')
 }
 
 // Per venster: open MIDI-inputs bijhouden zodat we ze kunnen sluiten
