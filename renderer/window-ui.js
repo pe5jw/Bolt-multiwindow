@@ -6,7 +6,9 @@
     window.electron.onInit(resolve)
   })
 
-  const { id: windowId, url, toolbarHeight = 36, midiEnabled = false, toolbarVisible = true } = config
+  const { id: windowId, url, toolbarHeight = 36, midiEnabled = false, toolbarVisible = true,
+          audioIn: savedAudioIn, audioOut: savedAudioOut,
+          midiIn: savedMidiIn, midiOut: savedMidiOut } = config
 
   // ── Toolbar zichtbaarheid ────────────────────────────────────────────────────
   // true   → altijd zichtbaar (standaard)
@@ -121,10 +123,28 @@
     }
   }
 
-  if (audioInSel)  audioInSel.addEventListener('change',  applyAudio)
-  if (audioOutSel) audioOutSel.addEventListener('change', applyAudio)
+  if (audioInSel) audioInSel.addEventListener('change', () => {
+    window.electron.saveDeviceSettings({ windowId, audioIn: audioInSel.value })
+    applyAudio()
+  })
+  if (audioOutSel) audioOutSel.addEventListener('change', () => {
+    window.electron.saveDeviceSettings({ windowId, audioOut: audioOutSel.value })
+    applyAudio()
+  })
 
   await loadAudioDevices()
+
+  // Opgeslagen apparaten herstellen
+  if (savedAudioIn  && audioInSel)  {
+    audioInSel.value = savedAudioIn
+    if (!audioInSel.value) audioInSel.value = ''  // onbekend apparaat → reset
+  }
+  if (savedAudioOut && audioOutSel) {
+    audioOutSel.value = savedAudioOut
+    if (!audioOutSel.value) audioOutSel.value = ''
+  }
+  if (savedAudioIn) applyAudio()
+
   navigator.mediaDevices.addEventListener('devicechange', loadAudioDevices)
 
   // ── MIDI ────────────────────────────────────────────────────────────────────
@@ -160,6 +180,7 @@
     midiInSel.addEventListener('change', () => {
       const port = parseInt(midiInSel.value, 10)
       window.electron.openMidiInput({ windowId, port })
+      window.electron.saveDeviceSettings({ windowId, midiIn: port })
       if (port === -1) {
         setMidiStatus(midiOutSel.value !== '-1' ? `uit: ${midiOutSel.options[midiOutSel.selectedIndex].text}` : 'geen MIDI', midiOutSel.value !== '-1')
       } else {
@@ -168,7 +189,9 @@
     })
 
     midiOutSel.addEventListener('change', () => {
-      window.electron.openMidiOutput({ windowId, port: parseInt(midiOutSel.value, 10) })
+      const port = parseInt(midiOutSel.value, 10)
+      window.electron.openMidiOutput({ windowId, port })
+      window.electron.saveDeviceSettings({ windowId, midiOut: port })
     })
 
     let midiTimeout = null
@@ -191,6 +214,22 @@
     })
 
     await loadMidiPorts()
+
+    // Opgeslagen MIDI poorten herstellen
+    if (savedMidiIn !== undefined && savedMidiIn !== -1) {
+      midiInSel.value = String(savedMidiIn)
+      if (midiInSel.value !== '') {
+        window.electron.openMidiInput({ windowId, port: savedMidiIn })
+        setMidiStatus(`in: ${midiInSel.options[midiInSel.selectedIndex]?.text || savedMidiIn}`, true)
+      }
+    }
+    if (savedMidiOut !== undefined && savedMidiOut !== -1) {
+      midiOutSel.value = String(savedMidiOut)
+      if (midiOutSel.value !== '') {
+        window.electron.openMidiOutput({ windowId, port: savedMidiOut })
+      }
+    }
   }
 
 })()
+

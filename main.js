@@ -248,3 +248,17 @@ ipcMain.on('create-window', (_, winConfig) => {
 ipcMain.on('close-window', (_, { windowId }) => {
   windows[windowId]?.close()
 })
+
+// Audio/MIDI apparaat-instellingen opslaan per venster in de actieve config
+ipcMain.on('save-device-settings', (_, { windowId, audioIn, audioOut, midiIn, midiOut }) => {
+  const config = loadConfig()
+  if (!config) return
+  const entry = config.windows.find(c => c.id === windowId)
+  if (entry) {
+    if (audioIn  !== undefined) entry.audioIn  = audioIn
+    if (audioOut !== undefined) entry.audioOut = audioOut
+    if (midiIn   !== undefined) entry.midiIn   = midiIn
+    if (midiOut  !== undefined) entry.midiOut  = midiOut
+    saveConfig(config)
+  }
+})

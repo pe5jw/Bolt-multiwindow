@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electron', {
   sendMidi:      (params)  => ipcRenderer.send('midi-send',        params),
   onMidi:        (cb)      => ipcRenderer.on('midi-message', (_, d) => cb(d)),
 
+  // Apparaat-instellingen opslaan in config (audioIn, audioOut, midiIn, midiOut)
+  saveDeviceSettings: (params) => ipcRenderer.send('save-device-settings', params),
+
   // Vensterbeheer
   createWindow:  (config)  => ipcRenderer.send('create-window',  config),
   closeWindow:   (params)  => ipcRenderer.send('close-window',   params),
