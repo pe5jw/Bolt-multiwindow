@@ -95,202 +95,160 @@ function getMidiPortNames() {
 }
 
 // ── Toolbar injectie ──────────────────────────────────────────────────────────
-// Bouwt de JS-string die in de geladen pagina wordt geïnjecteerd.
-// Werkt net als de BoltSDR client: geen iframe, direct in de pagina.
+// Zweefpaneel rechtsboven, BoltSDR-stijl. Klapt open/dicht.
+// Audio: setSinkId() op alle audio/video-elementen in de pagina +
+//        bolt-audio-config CustomEvent voor BoltSDR-compatible apps.
 function buildToolbarScript(winConfig, appConfig) {
-  const toolbarHeight  = appConfig.toolbar?.height  ?? 36
-  const toolbarVisible = appConfig.toolbar?.alwaysVisible ?? true
-  const midiEnabled    = appConfig.midi?.enabled ?? false
-  const windowId       = winConfig.id
-  const savedAudioIn   = winConfig.audioIn  ? JSON.stringify(winConfig.audioIn)  : 'null'
-  const savedAudioOut  = winConfig.audioOut ? JSON.stringify(winConfig.audioOut) : 'null'
-  const savedMidiIn    = winConfig.midiIn   != null ? winConfig.midiIn  : -1
-  const savedMidiOut   = winConfig.midiOut  != null ? winConfig.midiOut : -1
-
-  // Toolbar HTML en CSS als string
-  const html = `
-    <div id="bmw-toolbar" style="
-      position:fixed;top:0;left:0;right:0;
-      height:${toolbarHeight}px;
-      background:#111;border-bottom:1px solid #333;
-      display:flex;align-items:center;gap:6px;padding:0 8px;
-      font-family:monospace;font-size:11px;color:#ccc;
-      z-index:2147483647;
-      box-sizing:border-box;
-      -webkit-app-region:drag;
-    ">
-      <div style="display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1px solid #333;height:100%;-webkit-app-region:no-drag">
-        <span style="color:#888;font-size:10px">🎙 In</span>
-        <select id="bmw-ain" title="Audio invoer" style="background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:10px;max-width:130px;cursor:pointer">
-          <option value="">— geen —</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1px solid #333;height:100%;-webkit-app-region:no-drag">
-        <span style="color:#888;font-size:10px">🔊 Uit</span>
-        <select id="bmw-aout" title="Audio uitvoer" style="background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:10px;max-width:130px;cursor:pointer">
-          <option value="">— geen —</option>
-        </select>
-      </div>
-      ${midiEnabled ? `
-      <div style="display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1px solid #333;height:100%;-webkit-app-region:no-drag">
-        <span style="color:#888;font-size:10px">🎹 In</span>
-        <select id="bmw-min" style="background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:10px;max-width:130px;cursor:pointer">
-          <option value="-1">— geen —</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1px solid #333;height:100%;-webkit-app-region:no-drag">
-        <span style="color:#888;font-size:10px">🎹 Uit</span>
-        <select id="bmw-mout" style="background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:10px;max-width:130px;cursor:pointer">
-          <option value="-1">— geen —</option>
-        </select>
-      </div>
-      <div id="bmw-mstatus" style="padding:2px 8px;border:1px solid #333;border-radius:12px;font-size:10px;color:#888;-webkit-app-region:no-drag">geen MIDI</div>
-      ` : ''}
-    </div>
-    <div id="bmw-spacer" style="position:fixed;top:${toolbarHeight}px;left:0;right:0;bottom:0;pointer-events:none;z-index:-1"></div>
-  `
+  const midiEnabled  = appConfig.midi?.enabled ?? false
+  const windowId     = winConfig.id
+  const savedAudioIn  = JSON.stringify(winConfig.audioIn  || '')
+  const savedAudioOut = JSON.stringify(winConfig.audioOut || '')
+  const savedMidiIn   = winConfig.midiIn  != null ? winConfig.midiIn  : -1
+  const savedMidiOut  = winConfig.midiOut != null ? winConfig.midiOut : -1
 
   return `
 (async () => {
   try {
-    // Verwijder bestaande toolbar indien aanwezig (bij page reload)
-    const existing = document.getElementById('bmw-toolbar')
-    if (existing) existing.remove()
-    const existingSpacer = document.getElementById('bmw-spacer')
-    if (existingSpacer) existingSpacer.remove()
+    const WNDID = ${JSON.stringify(windowId)}
 
-    // Injecteer toolbar HTML
-    const tmp = document.createElement('div')
-    tmp.innerHTML = \`${html.replace(/`/g, '\\`')}\`
-    while (tmp.firstChild) document.body.appendChild(tmp.firstChild)
+    // Verwijder vorige injectie bij page-reload
+    document.getElementById('bmw-panel')?.remove()
 
-    // Verschuif body-inhoud zodat toolbar er niet overheen valt
-    document.body.style.marginTop = '${toolbarHeight}px'
+    // ── Paneel aanmaken (BoltSDR-stijl: rechtsboven, inklapbaar) ──────────
+    const panel = document.createElement('div')
+    panel.id = 'bmw-panel'
+    panel.style.cssText = 'position:fixed;top:0;right:0;cursor:move;background:#1a1a2e;border:1px solid #444;border-bottom-left-radius:6px;z-index:2147483647;font-family:monospace;font-size:10px;color:#888;min-width:220px;user-select:none;'
 
-    const toolbarEl = document.getElementById('bmw-toolbar')
-    const ainSel    = document.getElementById('bmw-ain')
-    const aoutSel   = document.getElementById('bmw-aout')
+    const mkSel = (id) => '<select id="'+id+'" style="width:100%;background:#111;border:1px solid #333;color:#ccc;padding:2px;font-size:9px;margin-top:2px"><option value="">standaard</option></select>'
+    const mkRow = (id, label) =>
+      '<div style="margin-bottom:6px"><span style="color:#555;font-size:9px">'+label+'</span>'+mkSel(id)+'</div>'
 
-    // ── Toolbar zichtbaarheid ──────────────────────────────────────────────
-    const VISIBLE = ${JSON.stringify(toolbarVisible)}
-    if (VISIBLE === false || VISIBLE === 'false') {
-      toolbarEl.style.display = 'none'
-      document.body.style.marginTop = '0'
-    } else if (VISIBLE === 'hide') {
-      toolbarEl.style.transition = 'opacity 0.25s ease'
-      toolbarEl.style.opacity = '0'
-      toolbarEl.style.pointerEvents = 'none'
-      const hotzone = document.createElement('div')
-      hotzone.style.cssText = 'position:fixed;top:0;left:0;right:0;height:8px;z-index:2147483647;'
-      document.body.appendChild(hotzone)
-      let hideTimer = null
-      function showBar() {
-        toolbarEl.style.opacity = '1'; toolbarEl.style.pointerEvents = 'auto'
-        clearTimeout(hideTimer)
-      }
-      function hideBar() {
-        hideTimer = setTimeout(() => { toolbarEl.style.opacity = '0'; toolbarEl.style.pointerEvents = 'none' }, 2000)
-      }
-      hotzone.addEventListener('mouseenter', showBar)
-      toolbarEl.addEventListener('mouseenter', showBar)
-      toolbarEl.addEventListener('mouseleave', hideBar)
+    panel.innerHTML =
+      '<div id="bmw-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;cursor:pointer;background:#111;border-bottom:1px solid #333;">' +
+        '<span style="color:#f0a500;font-size:9px;letter-spacing:2px">&#x1F50A; AUDIO</span>' +
+        '<span id="bmw-arr" style="color:#555;font-size:10px;margin-left:8px">&#x25BC;</span>' +
+      '</div>' +
+      '<div id="bmw-body" style="display:none;padding:8px;">' +
+        mkRow('bmw-aout', 'RX UIT (speaker/VAC)') +
+        mkRow('bmw-ain',  'TX IN  (microfoon/VAC)') +
+        ${midiEnabled ? `
+        '<div style="border-top:1px solid #333;margin:6px 0"></div>' +
+        '<div style="margin-bottom:6px"><span style="color:#555;font-size:9px">MIDI IN</span><select id="bmw-min" style="width:100%;background:#111;border:1px solid #333;color:#ccc;padding:2px;font-size:9px;margin-top:2px"><option value="-1">— geen —</option></select></div>' +
+        '<div style="margin-bottom:6px"><span style="color:#555;font-size:9px">MIDI UIT</span><select id="bmw-mout" style="width:100%;background:#111;border:1px solid #333;color:#ccc;padding:2px;font-size:9px;margin-top:2px"><option value="-1">— geen —</option></select></div>' +
+        '<div id="bmw-mst" style="font-size:9px;color:#555;margin-top:2px">geen MIDI</div>' +
+        ` : `''`} +
+        '<button id="bmw-apply" style="width:100%;background:#f0a500;border:none;color:#111;padding:4px;font-size:9px;border-radius:3px;cursor:pointer;margin-top:4px">TOEPASSEN</button>' +
+      '</div>'
+
+    document.body.appendChild(panel)
+
+    // Slepen
+    let dragging=false, dx=0, dy=0
+    panel.addEventListener('mousedown', e => {
+      if (['SELECT','BUTTON','INPUT'].includes(e.target.tagName)) return
+      dragging=true; dx=e.clientX-panel.getBoundingClientRect().left; dy=e.clientY-panel.getBoundingClientRect().top; e.preventDefault()
+    })
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return
+      panel.style.left=(e.clientX-dx)+'px'; panel.style.top=(e.clientY-dy)+'px'; panel.style.right='auto'
+    })
+    document.addEventListener('mouseup', () => dragging=false)
+
+    // Inklappen
+    let open = false
+    document.getElementById('bmw-hdr').onclick = () => {
+      open = !open
+      document.getElementById('bmw-body').style.display = open ? 'block' : 'none'
+      document.getElementById('bmw-arr').textContent = open ? '\\u25B2' : '\\u25BC'
     }
+
+    const ainSel  = document.getElementById('bmw-ain')
+    const aoutSel = document.getElementById('bmw-aout')
 
     // ── Audio apparaten laden ──────────────────────────────────────────────
     async function loadAudioDevices() {
-      try {
-        const tmp2 = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        tmp2.getTracks().forEach(t => t.stop())
-      } catch {}
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      const inputs  = devices.filter(d => d.kind === 'audioinput')
-      const outputs = devices.filter(d => d.kind === 'audiooutput')
-      const mkOpts = (list) => '<option value="">— geen —</option>' +
-        list.map(d => '<option value="' + d.deviceId + '">' + (d.label || d.deviceId.slice(0,20)) + '</option>').join('')
-      if (ainSel)  ainSel.innerHTML  = mkOpts(inputs)
-      if (aoutSel) aoutSel.innerHTML = mkOpts(outputs)
+      try { const t = await navigator.mediaDevices.getUserMedia({audio:true}); t.getTracks().forEach(t=>t.stop()) } catch {}
+      const devs = await navigator.mediaDevices.enumerateDevices()
+      const ins  = devs.filter(d=>d.kind==='audioinput')
+      const outs = devs.filter(d=>d.kind==='audiooutput')
+      const mkOpts = list => '<option value="">standaard</option>' +
+        list.map(d=>'<option value="'+d.deviceId+'">'+(d.label||d.deviceId.slice(0,18))+'</option>').join('')
+      ainSel.innerHTML  = mkOpts(ins)
+      aoutSel.innerHTML = mkOpts(outs)
     }
-
     await loadAudioDevices()
+    navigator.mediaDevices.addEventListener('devicechange', loadAudioDevices)
 
     // Herstel opgeslagen waarden
-    const savedIn  = ${savedAudioIn}
-    const savedOut = ${savedAudioOut}
-    if (savedIn  && ainSel)  { const o = [...ainSel.options].find(o => o.value === savedIn);   if (o) ainSel.value  = savedIn  }
-    if (savedOut && aoutSel) { const o = [...aoutSel.options].find(o => o.value === savedOut); if (o) aoutSel.value = savedOut }
+    const sIn  = ${savedAudioIn}
+    const sOut = ${savedAudioOut}
+    if (sIn  && [...ainSel.options].find(o=>o.value===sIn))   ainSel.value  = sIn
+    if (sOut && [...aoutSel.options].find(o=>o.value===sOut)) aoutSel.value = sOut
 
-    // Stuur audio-config event naar de pagina (bolt-audio-config protocol)
-    function dispatchAudioConfig() {
+    // ── Audio toepassen ────────────────────────────────────────────────────
+    // 1) setSinkId op alle bestaande en toekomstige audio/video-elementen
+    // 2) bolt-audio-config CustomEvent voor BoltSDR-compatible apps
+    async function applyAudio() {
+      const outId = aoutSel.value || ''
+      const inId  = ainSel.value  || ''
+
+      // setSinkId op alle audio/video elementen in de pagina
+      if (outId) {
+        document.querySelectorAll('audio, video').forEach(async el => {
+          try { await el.setSinkId(outId) } catch {}
+        })
+        // Observer voor nieuw toegevoegde elementen
+        if (!window._bmwObserver) {
+          window._bmwObserver = new MutationObserver(muts => {
+            muts.forEach(m => m.addedNodes.forEach(n => {
+              if (n.nodeType !== 1) return
+              const els = n.matches?.('audio,video') ? [n] : [...(n.querySelectorAll?.('audio,video')||[])]
+              els.forEach(async el => { try { await el.setSinkId(window._bmwSinkId||'') } catch {} })
+            }))
+          })
+          window._bmwObserver.observe(document.body, {childList:true, subtree:true})
+        }
+        window._bmwSinkId = outId
+      }
+
+      // bolt-audio-config event (voor BoltSDR server-apps)
       window.dispatchEvent(new CustomEvent('bolt-audio-config', { detail: {
-        tx1: { deviceId: ainSel?.value  || '', active: !!(ainSel?.value)  },
-        rx1: { deviceId: aoutSel?.value || '', active: !!(aoutSel?.value) },
+        rx1: { deviceId: outId, active: !!outId },
+        rx2: { deviceId: '',    active: false   },
+        tx1: { deviceId: inId,  active: !!inId  },
+        tx2: { deviceId: '',    active: false   },
       }}))
+
+      // Opslaan
+      window.electron?.saveDeviceSettings?.({ windowId: WNDID, audioIn: inId, audioOut: outId })
+
+      // Knop feedback
+      const btn = document.getElementById('bmw-apply')
+      if (btn) { btn.style.background='#2ecc71'; btn.textContent='OK ✓'; setTimeout(()=>{ btn.style.background='#f0a500'; btn.textContent='TOEPASSEN'; open=false; document.getElementById('bmw-body').style.display='none'; document.getElementById('bmw-arr').textContent='\\u25BC' },1500) }
     }
-    dispatchAudioConfig()
 
-    // Sla op + dispatch bij wijziging
-    if (ainSel) ainSel.addEventListener('change', () => {
-      window.electron?.saveDeviceSettings?.({ windowId: '${windowId}', audioIn: ainSel.value })
-      dispatchAudioConfig()
-    })
-    if (aoutSel) aoutSel.addEventListener('change', () => {
-      window.electron?.saveDeviceSettings?.({ windowId: '${windowId}', audioOut: aoutSel.value })
-      dispatchAudioConfig()
-    })
+    document.getElementById('bmw-apply').onclick = applyAudio
 
-    navigator.mediaDevices.addEventListener('devicechange', loadAudioDevices)
+    // Direct toepassen bij start (opgeslagen waarden)
+    if (sIn || sOut) setTimeout(applyAudio, 300)
 
     ${midiEnabled ? `
     // ── MIDI ──────────────────────────────────────────────────────────────
-    const minSel   = document.getElementById('bmw-min')
-    const moutSel  = document.getElementById('bmw-mout')
-    const mstatus  = document.getElementById('bmw-mstatus')
-
-    const { inputs: midiIns, outputs: midiOuts } = await window.electron.getMidiPorts()
-    if (minSel) minSel.innerHTML = '<option value="-1">— geen —</option>' +
-      midiIns.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('')
-    if (moutSel) moutSel.innerHTML = '<option value="-1">— geen —</option>' +
-      midiOuts.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('')
-
-    const savedMidiIn  = ${savedMidiIn}
-    const savedMidiOut = ${savedMidiOut}
-    if (savedMidiIn !== -1 && minSel) {
-      const o = [...minSel.options].find(o => o.value === String(savedMidiIn))
-      if (o) { minSel.value = String(savedMidiIn); window.electron.openMidiInput({ windowId: '${windowId}', port: savedMidiIn }); mstatus && (mstatus.textContent = 'in: '+o.text) }
-    }
-    if (savedMidiOut !== -1 && moutSel) {
-      const o = [...moutSel.options].find(o => o.value === String(savedMidiOut))
-      if (o) { moutSel.value = String(savedMidiOut); window.electron.openMidiOutput({ windowId: '${windowId}', port: savedMidiOut }) }
-    }
-
-    if (minSel) minSel.addEventListener('change', () => {
-      const p = parseInt(minSel.value)
-      window.electron.openMidiInput({ windowId: '${windowId}', port: p })
-      window.electron.saveDeviceSettings({ windowId: '${windowId}', midiIn: p })
-      mstatus && (mstatus.textContent = p === -1 ? 'geen MIDI' : 'in: '+minSel.options[minSel.selectedIndex].text)
-    })
-    if (moutSel) moutSel.addEventListener('change', () => {
-      const p = parseInt(moutSel.value)
-      window.electron.openMidiOutput({ windowId: '${windowId}', port: p })
-      window.electron.saveDeviceSettings({ windowId: '${windowId}', midiOut: p })
-    })
-
-    window.electron.onMidi(({ msg }) => {
-      if (!mstatus) return
-      const [status, note, velocity] = msg
-      const type = status >> 4
-      let label = type === 9 && velocity > 0 ? '▶ N'+note+' v'+velocity
-        : (type === 8 || (type === 9 && velocity === 0)) ? '■ N'+note
-        : type === 11 ? 'CC'+note+'='+velocity : '0x'+status.toString(16)
-      mstatus.textContent = label
-      clearTimeout(window._bmwMidiTimer)
-      window._bmwMidiTimer = setTimeout(() => {
-        mstatus.textContent = minSel?.selectedIndex > 0 ? 'in: '+minSel.options[minSel.selectedIndex].text : 'geen MIDI'
-      }, 1500)
-    })
+    const minSel  = document.getElementById('bmw-min')
+    const moutSel = document.getElementById('bmw-mout')
+    const mst     = document.getElementById('bmw-mst')
+    const { inputs: mIns, outputs: mOuts } = await window.electron.getMidiPorts()
+    minSel.innerHTML  = '<option value="-1">— geen —</option>' + mIns.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join('')
+    moutSel.innerHTML = '<option value="-1">— geen —</option>' + mOuts.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join('')
+    const sMiIn=${savedMidiIn}, sMiOut=${savedMidiOut}
+    if (sMiIn!==-1) { const o=[...minSel.options].find(o=>o.value===String(sMiIn)); if(o){minSel.value=String(sMiIn);window.electron.openMidiInput({windowId:WNDID,port:sMiIn});mst.textContent='in: '+o.text} }
+    if (sMiOut!==-1) { const o=[...moutSel.options].find(o=>o.value===String(sMiOut)); if(o){moutSel.value=String(sMiOut);window.electron.openMidiOutput({windowId:WNDID,port:sMiOut})} }
+    minSel.onchange  = () => { const p=parseInt(minSel.value); window.electron.openMidiInput({windowId:WNDID,port:p}); window.electron.saveDeviceSettings({windowId:WNDID,midiIn:p}); mst.textContent=p===-1?'geen MIDI':'in: '+minSel.options[minSel.selectedIndex].text }
+    moutSel.onchange = () => { const p=parseInt(moutSel.value); window.electron.openMidiOutput({windowId:WNDID,port:p}); window.electron.saveDeviceSettings({windowId:WNDID,midiOut:p}) }
+    window.electron.onMidi(({msg})=>{ const [s,n,v]=msg,t=s>>4; let l=t===9&&v>0?'▶ N'+n+' v'+v:(t===8||(t===9&&v===0))?'■ N'+n:t===11?'CC'+n+'='+v:'0x'+s.toString(16); mst.textContent=l; clearTimeout(window._bmwMt); window._bmwMt=setTimeout(()=>mst.textContent=minSel.selectedIndex>0?'in: '+minSel.options[minSel.selectedIndex].text:'geen MIDI',1500) })
     ` : ''}
 
-  } catch(e) { console.error('[BMW toolbar]', e) }
+  } catch(e) { console.error('[BMW]', e) }
 })()
 `
 }
