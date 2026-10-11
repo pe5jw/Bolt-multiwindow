@@ -63,7 +63,13 @@ let ACTIVE_CONFIG_PATH = null
 
 function loadConfig() {
   try {
-    return JSON.parse(fs.readFileSync(ACTIVE_CONFIG_PATH, 'utf8'))
+    const cfg = JSON.parse(fs.readFileSync(ACTIVE_CONFIG_PATH, 'utf8'))
+    // Saniteer NaN waarden die eerder per ongeluk opgeslagen zijn
+    for (const w of cfg.windows || []) {
+      if (!Number.isFinite(w.midiIn))  w.midiIn  = -1
+      if (!Number.isFinite(w.midiOut)) w.midiOut = -1
+    }
+    return cfg
   } catch (err) {
     dialog.showErrorBox('Config fout', `Kan config niet lezen:\n${ACTIVE_CONFIG_PATH}\n\n${err.message}`)
     app.quit()
@@ -103,8 +109,8 @@ function buildToolbarScript(winConfig, appConfig) {
   const windowId     = winConfig.id
   const savedAudioIn  = JSON.stringify(winConfig.audioIn  || '')
   const savedAudioOut = JSON.stringify(winConfig.audioOut || '')
-  const savedMidiIn   = winConfig.midiIn  != null ? winConfig.midiIn  : -1
-  const savedMidiOut  = winConfig.midiOut != null ? winConfig.midiOut : -1
+  const savedMidiIn   = Number.isFinite(winConfig.midiIn)  ? winConfig.midiIn  : -1
+  const savedMidiOut  = Number.isFinite(winConfig.midiOut) ? winConfig.midiOut : -1
 
   return `
 (async () => {
@@ -384,8 +390,8 @@ ipcMain.on('save-device-settings', (_, { windowId, audioIn, audioOut, midiIn, mi
   if (entry) {
     if (audioIn  !== undefined) entry.audioIn  = audioIn
     if (audioOut !== undefined) entry.audioOut = audioOut
-    if (midiIn   !== undefined) entry.midiIn   = midiIn
-    if (midiOut  !== undefined) entry.midiOut  = midiOut
+    if (midiIn  !== undefined) entry.midiIn  = Number.isFinite(midiIn)  ? midiIn  : -1
+    if (midiOut !== undefined) entry.midiOut = Number.isFinite(midiOut) ? midiOut : -1
     saveConfig(config)
     // Update winConfig in-memory zodat herlaad ook werkt
     if (audioOut !== undefined) {
