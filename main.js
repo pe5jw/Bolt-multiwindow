@@ -381,21 +381,41 @@ ipcMain.on('midi-open-input', (_, { windowId, port }) => {
   if (!midi) return
   closeMidiForWindow(windowId)
   if (port === -1) return
-  const input = new midi.Input()
-  input.openPort(port)
-  input.on('message', (dt, msg) => {
-    windows[windowId]?.webContents.send('midi-message', { dt, msg: Array.from(msg) })
-  })
-  midiInputs[windowId] = input
+  try {
+    const inp = new midi.Input()
+    const count = inp.getPortCount()
+    if (port >= count) {
+      console.warn(`[BMW] MIDI input poort ${port} bestaat niet (max ${count - 1})`)
+      inp.closePort()
+      return
+    }
+    inp.openPort(port)
+    inp.on('message', (dt, msg) => {
+      windows[windowId]?.webContents.send('midi-message', { dt, msg: Array.from(msg) })
+    })
+    midiInputs[windowId] = inp
+  } catch (err) {
+    console.error('[BMW] MIDI input fout:', err.message)
+  }
 })
 
 ipcMain.on('midi-open-output', (_, { windowId, port }) => {
   if (!midi) return
   if (midiOutputs[windowId]) { try { midiOutputs[windowId].closePort() } catch {} delete midiOutputs[windowId] }
   if (port === -1) return
-  const output = new midi.Output()
-  output.openPort(port)
-  midiOutputs[windowId] = output
+  try {
+    const out = new midi.Output()
+    const count = out.getPortCount()
+    if (port >= count) {
+      console.warn(`[BMW] MIDI output poort ${port} bestaat niet (max ${count - 1})`)
+      out.closePort()
+      return
+    }
+    out.openPort(port)
+    midiOutputs[windowId] = out
+  } catch (err) {
+    console.error('[BMW] MIDI output fout:', err.message)
+  }
 })
 
 ipcMain.on('midi-send', (_, { windowId, msg }) => {
