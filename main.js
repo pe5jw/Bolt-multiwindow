@@ -187,31 +187,48 @@ function buildToolbarScript(winConfig, appConfig) {
 
     // ── Audio toepassen ────────────────────────────────────────────────────
     // 1) setSinkId op alle bestaande en toekomstige audio/video-elementen
-    // 2) bolt-audio-config CustomEvent voor BoltSDR-compatible apps
+    // 2) AudioContext.setSinkId() voor Web Audio API (BoltSDR gebruikt dit)
+    // 3) bolt-audio-config CustomEvent voor BoltSDR-compatible apps
     async function applyAudio() {
       const outId = aoutSel.value || ''
       const inId  = ainSel.value  || ''
 
-      // setSinkId op alle audio/video elementen in de pagina
-      if (outId) {
-        document.querySelectorAll('audio, video').forEach(async el => {
-          try { await el.setSinkId(outId) } catch {}
+      window._bmwSinkId = outId
+
+      // setSinkId op alle bestaande audio/video elementen
+      document.querySelectorAll('audio, video').forEach(async el => {
+        try { await el.setSinkId(outId) } catch {}
+      })
+
+      // Observer voor nieuw toegevoegde audio/video elementen
+      if (!window._bmwObserver) {
+        window._bmwObserver = new MutationObserver(muts => {
+          muts.forEach(m => m.addedNodes.forEach(n => {
+            if (n.nodeType !== 1) return
+            const els = n.matches?.('audio,video') ? [n] : [...(n.querySelectorAll?.('audio,video')||[])]
+            els.forEach(async el => { try { await el.setSinkId(window._bmwSinkId||'') } catch {} })
+          }))
         })
-        // Observer voor nieuw toegevoegde elementen
-        if (!window._bmwObserver) {
-          window._bmwObserver = new MutationObserver(muts => {
-            muts.forEach(m => m.addedNodes.forEach(n => {
-              if (n.nodeType !== 1) return
-              const els = n.matches?.('audio,video') ? [n] : [...(n.querySelectorAll?.('audio,video')||[])]
-              els.forEach(async el => { try { await el.setSinkId(window._bmwSinkId||'') } catch {} })
-            }))
-          })
-          window._bmwObserver.observe(document.body, {childList:true, subtree:true})
-        }
-        window._bmwSinkId = outId
+        window._bmwObserver.observe(document.body, {childList:true, subtree:true})
       }
 
-      // bolt-audio-config event (voor BoltSDR server-apps)
+      // AudioContext.setSinkId() — voor apps die Web Audio gebruiken (BoltSDR)
+      if (typeof AudioContext !== 'undefined') {
+        // Patch toekomstige AudioContexten
+        if (!window._bmwAcPatched) {
+          const OrigAC = window.AudioContext
+          window.AudioContext = function(...args) {
+            const ac = new OrigAC(...args)
+            if (window._bmwSinkId && ac.setSinkId) ac.setSinkId(window._bmwSinkId).catch(()=>{})
+            return ac
+          }
+          window.AudioContext.prototype = OrigAC.prototype
+          window._bmwAcPatched = true
+        }
+        // Pas toe op alle bestaande AudioContexten via bolt-audio-config response
+      }
+
+      // bolt-audio-config event (BoltSDR luistert hiernaar en routeert audio)
       window.dispatchEvent(new CustomEvent('bolt-audio-config', { detail: {
         rx1: { deviceId: outId, active: !!outId },
         rx2: { deviceId: '',    active: false   },
@@ -219,12 +236,12 @@ function buildToolbarScript(winConfig, appConfig) {
         tx2: { deviceId: '',    active: false   },
       }}))
 
-      // Opslaan
+      // Opslaan in config
       window.electron?.saveDeviceSettings?.({ windowId: WNDID, audioIn: inId, audioOut: outId })
 
-      // Knop feedback
+      // Knop feedback — panel blijft open zodat je de keuze ziet
       const btn = document.getElementById('bmw-apply')
-      if (btn) { btn.style.background='#2ecc71'; btn.textContent='OK ✓'; setTimeout(()=>{ btn.style.background='#f0a500'; btn.textContent='TOEPASSEN'; open=false; document.getElementById('bmw-body').style.display='none'; document.getElementById('bmw-arr').textContent='\\u25BC' },1500) }
+      if (btn) { btn.style.background='#2ecc71'; btn.textContent='OPGESLAGEN ✓'; setTimeout(()=>{ btn.style.background='#f0a500'; btn.textContent='TOEPASSEN' },2000) }
     }
 
     document.getElementById('bmw-apply').onclick = applyAudio
@@ -241,11 +258,11 @@ function buildToolbarScript(winConfig, appConfig) {
     minSel.innerHTML  = '<option value="-1">— geen —</option>' + mIns.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join('')
     moutSel.innerHTML = '<option value="-1">— geen —</option>' + mOuts.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join('')
     const sMiIn=${savedMidiIn}, sMiOut=${savedMidiOut}
-    if (sMiIn!==-1) { const o=[...minSel.options].find(o=>o.value===String(sMiIn)); if(o){minSel.value=String(sMiIn);window.electron.openMidiInput({windowId:WNDID,port:sMiIn});mst.textContent='in: '+o.text} }
+    if (sMiIn!==-1 && !isNaN(sMiIn)) { const o=[...minSel.options].find(o=>o.value===String(sMiIn)); if(o){minSel.value=String(sMiIn);window.electron.openMidiInput({windowId:WNDID,port:sMiIn});mst.textContent='in: '+o.text} }
     if (sMiOut!==-1) { const o=[...moutSel.options].find(o=>o.value===String(sMiOut)); if(o){moutSel.value=String(sMiOut);window.electron.openMidiOutput({windowId:WNDID,port:sMiOut})} }
     minSel.onchange  = () => { const p=parseInt(minSel.value); window.electron.openMidiInput({windowId:WNDID,port:p}); window.electron.saveDeviceSettings({windowId:WNDID,midiIn:p}); mst.textContent=p===-1?'geen MIDI':'in: '+minSel.options[minSel.selectedIndex].text }
     moutSel.onchange = () => { const p=parseInt(moutSel.value); window.electron.openMidiOutput({windowId:WNDID,port:p}); window.electron.saveDeviceSettings({windowId:WNDID,midiOut:p}) }
-    window.electron.onMidi(({msg})=>{ const [s,n,v]=msg,t=s>>4; let l=t===9&&v>0?'▶ N'+n+' v'+v:(t===8||(t===9&&v===0))?'■ N'+n:t===11?'CC'+n+'='+v:'0x'+s.toString(16); mst.textContent=l; clearTimeout(window._bmwMt); window._bmwMt=setTimeout(()=>mst.textContent=minSel.selectedIndex>0?'in: '+minSel.options[minSel.selectedIndex].text:'geen MIDI',1500) })
+    window.electron.onMidi(({msg})=>{ const [s,n,v]=msg,t=s>>4; let l=t===9&&v>0?'▶ N'+n+' v'+v:(t===8||(t===9&&v===0))?'■ N'+n:t===11?'CC'+n+'='+v:'0x'+(s||0).toString(16); mst.textContent=l; clearTimeout(window._bmwMt); const sel=minSel.selectedIndex; window._bmwMt=setTimeout(()=>mst.textContent=sel>0&&minSel.options[sel]?'in: '+minSel.options[sel].text:'geen MIDI',1500) })
     ` : ''}
 
   } catch(e) { console.error('[BMW]', e) }
