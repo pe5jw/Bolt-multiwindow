@@ -60,11 +60,14 @@
   }
 
   // ── Audio apparaten ─────────────────────────────────────────────────────────
+  // De audio-selectoren sturen de gekozen apparaten via bolt-audio-config
+  // als CustomEvent naar de iframe-pagina (BoltSDR-protocol).
+  // Er wordt GEEN AudioContext loopback aangemaakt — dat zou microfoon
+  // rechtstreeks naar de speakers sturen, wat niet de bedoeling is.
+
   const audioInSel  = document.getElementById('audio-in')
   const audioOutSel = document.getElementById('audio-out')
-
-  let audioCtx    = null
-  let audioStream = null
+  const frame       = document.getElementById('frame')
 
   async function loadAudioDevices() {
     try {
@@ -87,63 +90,40 @@
       ).join('')
   }
 
-  async function applyAudio() {
-    if (audioStream) audioStream.getTracks().forEach(t => t.stop())
-    if (audioCtx)    await audioCtx.close().catch(() => {})
-    audioCtx    = null
-    audioStream = null
-
+  // Stuur bolt-audio-config event naar de iframe via postMessage
+  function sendAudioConfig() {
     const inId  = audioInSel.value
     const outId = audioOutSel.value
-
-    if (!inId) return
-
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({
-        audio: inId ? { deviceId: { exact: inId } } : true,
-        video: false,
-      })
-
-      const ctxOptions = {}
-      if (outId && typeof AudioContext !== 'undefined') {
-        try { ctxOptions.sinkId = outId } catch {}
-      }
-
-      audioCtx = new AudioContext(ctxOptions)
-
-      if (outId && audioCtx.setSinkId) {
-        await audioCtx.setSinkId(outId).catch(() => {})
-      }
-
-      const source = audioCtx.createMediaStreamSource(audioStream)
-      source.connect(audioCtx.destination)
-
-    } catch (err) {
-      console.warn('[audio] fout:', err.message)
+    const detail = {
+      tx1: { deviceId: inId,  active: !!inId  },
+      rx1: { deviceId: outId, active: !!outId },
     }
+    // postMessage naar iframe (werkt als pagina luistert naar dit event)
+    frame?.contentWindow?.postMessage({ type: 'bolt-audio-config', detail }, '*')
   }
 
   if (audioInSel) audioInSel.addEventListener('change', () => {
     window.electron.saveDeviceSettings({ windowId, audioIn: audioInSel.value })
-    applyAudio()
+    sendAudioConfig()
   })
   if (audioOutSel) audioOutSel.addEventListener('change', () => {
     window.electron.saveDeviceSettings({ windowId, audioOut: audioOutSel.value })
-    applyAudio()
+    sendAudioConfig()
   })
 
   await loadAudioDevices()
 
-  // Opgeslagen apparaten herstellen
-  if (savedAudioIn  && audioInSel)  {
-    audioInSel.value = savedAudioIn
-    if (!audioInSel.value) audioInSel.value = ''  // onbekend apparaat → reset
+  // Opgeslagen audio-apparaten herstellen — pas ná loadAudioDevices zodat de opties bestaan
+  if (savedAudioIn && audioInSel) {
+    const match = [...audioInSel.options].find(o => o.value === savedAudioIn)
+    if (match) audioInSel.value = savedAudioIn
   }
   if (savedAudioOut && audioOutSel) {
-    audioOutSel.value = savedAudioOut
-    if (!audioOutSel.value) audioOutSel.value = ''
+    const match = [...audioOutSel.options].find(o => o.value === savedAudioOut)
+    if (match) audioOutSel.value = savedAudioOut
   }
-  if (savedAudioIn) applyAudio()
+  // Stuur config door zodra iframe geladen is
+  frame?.addEventListener('load', sendAudioConfig)
 
   navigator.mediaDevices.addEventListener('devicechange', loadAudioDevices)
 
@@ -215,17 +195,19 @@
 
     await loadMidiPorts()
 
-    // Opgeslagen MIDI poorten herstellen
+    // Opgeslagen MIDI poorten herstellen — pas ná loadMidiPorts zodat de opties bestaan
     if (savedMidiIn !== undefined && savedMidiIn !== -1) {
-      midiInSel.value = String(savedMidiIn)
-      if (midiInSel.value !== '') {
+      const match = [...midiInSel.options].find(o => o.value === String(savedMidiIn))
+      if (match) {
+        midiInSel.value = String(savedMidiIn)
         window.electron.openMidiInput({ windowId, port: savedMidiIn })
-        setMidiStatus(`in: ${midiInSel.options[midiInSel.selectedIndex]?.text || savedMidiIn}`, true)
+        setMidiStatus(`in: ${match.text}`, true)
       }
     }
     if (savedMidiOut !== undefined && savedMidiOut !== -1) {
-      midiOutSel.value = String(savedMidiOut)
-      if (midiOutSel.value !== '') {
+      const match = [...midiOutSel.options].find(o => o.value === String(savedMidiOut))
+      if (match) {
+        midiOutSel.value = String(savedMidiOut)
         window.electron.openMidiOutput({ windowId, port: savedMidiOut })
       }
     }

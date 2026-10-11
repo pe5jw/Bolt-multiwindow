@@ -164,6 +164,10 @@ function createWindow(winConfig, appConfig) {
       toolbarHeight,
       midiEnabled: appConfig.midi?.enabled ?? false,
       toolbarVisible,
+      audioIn:  winConfig.audioIn,
+      audioOut: winConfig.audioOut,
+      midiIn:   winConfig.midiIn,
+      midiOut:  winConfig.midiOut,
     })
   })
 
