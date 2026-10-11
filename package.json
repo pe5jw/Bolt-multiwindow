@@ -1,6 +1,6 @@
 {
   "name": "bolt-multiwindow",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Multi-venster Electron app met audio en MIDI per venster",
   "main": "main.js",
   "author": "PE5JW",
