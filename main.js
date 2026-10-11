@@ -32,11 +32,11 @@ app.on('ready', () => {
 })
 
 // ── Config ────────────────────────────────────────────────────────────────────
-// Bij een portable .exe: zoek configs naast de exe (niet in de ASAR)
-// Bij development (electron .): zoek in de projectmap
-const APP_DIR = app.isPackaged
-  ? path.dirname(app.getPath('exe'))
-  : app.getAppPath()
+// Bij een portable .exe pakt electron-builder de exe uit naar een Temp-map.
+// process.env.PORTABLE_EXECUTABLE_DIR bevat de map waar de .exe écht staat.
+// Bij development (electron .): gebruik de projectmap.
+const APP_DIR = process.env.PORTABLE_EXECUTABLE_DIR
+  ?? (app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath())
 
 // Zoek alle config*.json bestanden in de app-map
 function findConfigs() {
