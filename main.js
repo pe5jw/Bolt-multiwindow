@@ -173,6 +173,14 @@ function createWindow(winConfig, appConfig) {
       midiIn:   winConfig.midiIn,
       midiOut:  winConfig.midiOut,
     })
+    // Herstel opgeslagen audio output op het venster bij opstarten
+    if (winConfig.audioOut) {
+      try {
+        win.webContents.setAudioOutputDevice(winConfig.audioOut)
+      } catch (e) {
+        console.warn('[audio] setAudioOutputDevice niet beschikbaar:', e.message)
+      }
+    }
   })
 
   // Grootte en positie opslaan bij sluiten
@@ -258,6 +266,7 @@ ipcMain.on('close-window', (_, { windowId }) => {
 })
 
 // Audio/MIDI apparaat-instellingen opslaan per venster in de actieve config
+// en audio output direct toepassen op het venster via setAudioOutputDevice
 ipcMain.on('save-device-settings', (_, { windowId, audioIn, audioOut, midiIn, midiOut }) => {
   const config = loadConfig()
   if (!config) return
@@ -268,5 +277,18 @@ ipcMain.on('save-device-settings', (_, { windowId, audioIn, audioOut, midiIn, mi
     if (midiIn   !== undefined) entry.midiIn   = midiIn
     if (midiOut  !== undefined) entry.midiOut  = midiOut
     saveConfig(config)
+  }
+
+  // Pas audio output direct toe op het venster (stuurt het iframe mee)
+  if (audioOut !== undefined) {
+    const win = windows[windowId]
+    if (win && !win.isDestroyed()) {
+      // setAudioOutputDevice beschikbaar vanaf Electron 23
+      try {
+        win.webContents.setAudioOutputDevice(audioOut || 'default')
+      } catch (e) {
+        console.warn('[audio] setAudioOutputDevice niet beschikbaar:', e.message)
+      }
+    }
   }
 })
