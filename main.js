@@ -32,7 +32,11 @@ app.on('ready', () => {
 })
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const APP_DIR = app.getAppPath()
+// Bij een portable .exe: zoek configs naast de exe (niet in de ASAR)
+// Bij development (electron .): zoek in de projectmap
+const APP_DIR = app.isPackaged
+  ? path.dirname(app.getPath('exe'))
+  : app.getAppPath()
 
 // Zoek alle config*.json bestanden in de app-map
 function findConfigs() {
