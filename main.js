@@ -331,9 +331,12 @@ function createWindow(winConfig, appConfig) {
       try { win.webContents.setAudioOutputDevice(winConfig.audioOut) } catch {}
     }
 
-    // Injecteer toolbar als overlay in de pagina
-    const script = buildToolbarScript(winConfig, appConfig)
-    win.webContents.executeJavaScript(script).catch(e => console.error('[BMW inject]', e))
+    // Injecteer toolbar als overlay — alleen als toolbar niet uitgeschakeld is
+    const toolbarEnabled = winConfig.toolbar !== false
+    if (toolbarEnabled) {
+      const script = buildToolbarScript(winConfig, appConfig)
+      win.webContents.executeJavaScript(script).catch(e => console.error('[BMW inject]', e))
+    }
   })
 
   // Grootte en positie opslaan bij sluiten
