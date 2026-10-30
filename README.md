@@ -1,150 +1,188 @@
 # Bolt-MultiWindow
 
-Één Electron-app met een variabel aantal vensters. Elk venster laadt een eigen URL en heeft zijn eigen audio- en MIDI-selectors. Ideaal als dashboard, mediacontroller of multi-scherm opstelling.
+Electron-app die meerdere vensters opent, elk met een eigen URL. Per venster is een zwevend audio/MIDI-paneel beschikbaar voor het instellen van audio-routing en MIDI-poorten. Ideaal als multi-scherm dashboard of radiostation-opstelling.
 
 ---
 
 ## Functionaliteiten
 
-- **Meerdere vensters** — stel elk venster in met een eigen URL, titel, grootte en positie
-- **Audio per venster** — kies een apart audio-invoer en -uitvoer apparaat per venster
+- **Meerdere vensters** — elk venster laadt een eigen URL, met eigen titel, grootte en positie
+- **Floating audio/MIDI-paneel** — BoltSDR-stijl zweefpaneel per venster (rechtsboven, inklapbaar)
+- **Audio-routing per venster** — kies RX-uitgang (speaker/VAC) en TX-ingang (microfoon/VAC) via `setSinkId()`
 - **MIDI per venster** — eigen MIDI-in en MIDI-uit poort per venster (via `@julusian/midi`)
-- **Venstergrootte** — per venster instelbaar als vast of vrij formaat
-- **Toolbar opties** — altijd zichtbaar, automatisch verbergen, of helemaal weg
-- **Positie onthouden** — grootte en positie worden automatisch opgeslagen bij sluiten
+- **Toolbar per venster aan/uit** — vensters zonder audio/MIDI-behoefte kunnen het paneel uitzetten
+- **Positie onthouden** — grootte en positie worden automatisch opgeslagen bij het sluiten
+- **Meerdere configs** — meerdere `config*.json` bestanden naast de exe; bij opstarten een keuzevenster
 - **Lokale SSL** — zelf-ondertekende certificaten worden geaccepteerd voor privé IP-adressen
-- **Windows en Linux** — inclusief startscripts en snelkoppeling op het bureaublad
+- **BoltSDR-compatible** — stuurt `bolt-audio-config` CustomEvent naar geladen pagina's
 
 ---
 
-## Snel starten
+## Installatie en gebruik
 
-### Windows (PowerShell of cmd)
+### Windows (portable exe)
+
+1. Download `Bolt-MultiWindow x.x.x.exe` uit de [Releases](../../releases)
+2. Zet de exe in een map naar keuze
+3. Maak een `config.json` in dezelfde map (zie hieronder)
+4. Dubbelklik de exe
+
+### Vanuit broncode
+
 ```powershell
-Expand-Archive electron-multiwindow.zip -DestinationPath .
-cd electron-multiwindow
-.\start.bat
+git clone https://github.com/pe5jw/Bolt-multiwindow
+cd Bolt-multiwindow
+npm install
+npm start
 ```
 
-Of dubbelklik gewoon **`start.bat`** — installeert alles automatisch de eerste keer.
-
-Snelkoppeling op bureaublad: dubbelklik **`maak-snelkoppeling.bat`**
-
-> **Vereiste**: [Node.js LTS](https://nodejs.org) — geen build tools nodig
-
-### Linux
-```bash
-chmod +x start.sh maak-snelkoppeling.sh
-./start.sh
-
-# Snelkoppeling bureaublad + app-menu:
-./maak-snelkoppeling.sh
+Bouwen:
+```powershell
+npm run dist:win    # Windows portable exe
+npm run dist:linux  # Linux tar.gz
 ```
-
-> **Vereiste**: `sudo apt install nodejs npm` (Debian/Ubuntu)
-
----
-
-## Meerdere configuraties
-
-Je kunt meerdere config-bestanden naast de app bewaren. Bij het opstarten verschijnt een keuzevenster als er meer dan één config gevonden wordt.
-
-Naamgeving — elk bestand dat begint met `config` en eindigt op `.json` wordt automatisch opgepikt:
-
-```
-config.json           ← standaard opstelling
-config-radio.json     ← radio opstelling
-config-studio.json    ← studio opstelling
-```
-
-Bij **één** config-bestand start de app direct zonder te vragen.
 
 ---
 
 ## config.json
 
-Staat **naast de app** (zelfde map als `main.js`).
-Grootte en positie worden automatisch opgeslagen bij het sluiten van een venster in de actieve config.
-Zie `config.example.jsonc` voor een volledig becommentarieerde versie.
+Staat **naast de exe** (of naast `main.js` bij ontwikkeling).  
+Grootte en positie worden automatisch opgeslagen bij sluiten.
 
 ```jsonc
 {
   "windows": [
     {
-      "id": "scherm1",       // Uniek ID (geen spaties)
-      "title": "Scherm 1",   // Titel in de titelbalk
-      "url": "https://...",  // URL geladen in het venster
+      "id": "sdr",
+      "title": "SDR Ontvanger",
+      "url": "http://192.168.1.10:8073",
       "width": 1280,
-      "height": 720,
-      "x": 0,                // Beginpositie (optioneel, weglaten = automatisch)
+      "height": 800,
+      "x": 0,
       "y": 0,
-      "resizable": true      // Zie opties hieronder
+      "resizable": true,
+      "toolbar": true,
+      "audioIn": "",
+      "audioOut": "",
+      "midiIn": -1,
+      "midiOut": -1
+    },
+    {
+      "id": "kaart",
+      "title": "Kaart",
+      "url": "http://192.168.1.10:8080/map",
+      "width": 800,
+      "height": 600,
+      "toolbar": false
     }
-    // Voeg zoveel vensters toe als je wilt
   ],
   "midi": {
-    "enabled": true          // Zie opties hieronder
-  },
-  "toolbar": {
-    "height": 36,            // Hoogte in pixels (aanbevolen: 32–48)
-    "alwaysVisible": true    // Zie opties hieronder
+    "enabled": true
   }
 }
 ```
 
-### `resizable` — venstergrootte
+---
+
+## Venster-opties
+
+### `id` — uniek venster-ID
+Verplicht. Wordt gebruikt als sleutel voor opgeslagen instellingen. Geen spaties.
+
+### `title` — venstertitel
+Tekst in de titelbalk. Standaard gelijk aan `id`.
+
+### `url` — te laden URL
+De webpagina die in het venster wordt geladen. Lokale en externe URLs werken. Privé IP-adressen (192.168.x.x, 10.x.x.x, 172.16-31.x.x) accepteren automatisch zelf-ondertekende SSL-certificaten.
+
+### `width` / `height` — venstergrootte
+Begingrootte in pixels. Wordt automatisch bijgewerkt bij sluiten.
+
+### `x` / `y` — beginpositie
+Positie van het venster op het scherm. Weglaten = automatisch bepaald door het OS. Wordt automatisch bijgewerkt bij sluiten.
+
+### `resizable` — venster vergroot-/verkleinen
 
 | Waarde | Gedrag |
 |--------|--------|
-| `true` | Venster vrij te vergroten/verkleinen met de muis *(standaard)* |
-| `false` | Vast formaat, venster kan niet worden aangepast |
+| `true` | Vrij te vergroten/verkleinen *(standaard)* |
+| `false` | Vast formaat |
 
-### `alwaysVisible` — toolbar gedrag
-
-| Waarde | Gedrag |
-|--------|--------|
-| `true` | Toolbar altijd zichtbaar bovenaan het venster *(standaard)* |
-| `"hide"` | Toolbar verdwijnt na 2 seconden; verschijnt weer als je met de muis naar de bovenkant beweegt |
-| `false` | Toolbar helemaal verborgen; iframe vult het volledige venster |
-
-### `midi.enabled` — MIDI-selectors
+### `toolbar` — audio/MIDI-paneel
 
 | Waarde | Gedrag |
 |--------|--------|
-| `true` | MIDI in/uit selectors zichtbaar in de toolbar per venster |
-| `false` | MIDI volledig verborgen (ook als er MIDI-apparaten zijn) |
+| `true` | Zwevend paneel rechtsboven zichtbaar *(standaard)* |
+| `false` | Geen paneel — pagina blijft volledig ongewijzigd |
+
+Gebruik `toolbar: false` voor vensters die geen audio- of MIDI-beheer nodig hebben, zoals kaarten, statuspagina's of dashboards.
+
+### `audioOut` — audio-uitgang (RX)
+DeviceId van het gewenste audio-uitvoerapparaat (speaker of VAC). Wordt automatisch opgeslagen na het klikken op **TOEPASSEN** in het paneel. Leeg laten = standaard systeemapparaat.
+
+### `audioIn` — audio-ingang (TX)
+DeviceId van het gewenste audio-invoerapparaat (microfoon of VAC). Wordt automatisch opgeslagen na **TOEPASSEN**.
+
+### `midiIn` — MIDI-ingang
+Poortnummer (0-gebaseerd) van de gewenste MIDI-ingang. `-1` = geen. Wordt automatisch opgeslagen bij selectie.
+
+### `midiOut` — MIDI-uitgang
+Poortnummer (0-gebaseerd) van de gewenste MIDI-uitgang. `-1` = geen.
 
 ---
 
-## Projectstructuur
+## Globale opties
+
+### `midi.enabled` — MIDI-selectors tonen
+
+| Waarde | Gedrag |
+|--------|--------|
+| `true` | MIDI in/uit selectors zichtbaar in het paneel |
+| `false` | MIDI volledig verborgen *(standaard)* |
+
+---
+
+## Het audio/MIDI-paneel
+
+Het paneel verschijnt rechtsboven in elk venster met `toolbar: true`. Klik op de header om het in/uit te klappen.
+
+| Element | Functie |
+|---------|---------|
+| **RX UIT** | Audio-uitgang — kies speaker of VAC voor ontvangstgeluid |
+| **TX IN** | Audio-ingang — kies microfoon of VAC voor zenden |
+| **MIDI IN** | MIDI-ingang voor dit venster |
+| **MIDI UIT** | MIDI-uitgang voor dit venster |
+| **TOEPASSEN** | Past instellingen toe en slaat op in config.json |
+
+Na **TOEPASSEN** worden de instellingen opgeslagen en bij de volgende start automatisch hersteld.
+
+Het paneel is versleepbaar (klik en sleep op de header).
+
+### Audio-routing
+
+Audio wordt gerouteerd via `setSinkId()` op alle `<audio>` en `<video>` elementen in de pagina. Voor pagina's die Web Audio API gebruiken (zoals BoltSDR) wordt bovendien een `bolt-audio-config` CustomEvent verstuurd. Een MutationObserver zorgt dat ook dynamisch toegevoegde media-elementen het juiste apparaat krijgen.
+
+---
+
+## Meerdere configuraties
+
+Alle bestanden naast de exe die overeenkomen met `config*.json` worden automatisch opgepikt:
 
 ```
-bolt-multiwindow/
-├── config.json               ← Jouw instellingen (wordt automatisch bijgewerkt)
-├── config.example.jsonc      ← Voorbeeld met uitleg van alle opties
-├── main.js                   ← Electron hoofdproces
-├── preload.js                ← Beveiligde brug tussen main en renderer
-├── package.json
-├── start.bat                 ← Windows startscript
-├── start.sh                  ← Linux startscript
-├── maak-snelkoppeling.bat    ← Windows bureaublad snelkoppeling
-├── maak-snelkoppeling.sh     ← Linux bureaublad + app-menu snelkoppeling
-├── assets/
-│   └── icon.svg
-└── renderer/
-    ├── window-ui.html        ← Toolbar lay-out en stijl
-    └── window-ui.js          ← Venster logica (audio, MIDI, toolbar gedrag)
+config.json           ← standaard opstelling
+config-radio.json     ← radio opstelling
+config-contest.json   ← contest opstelling
 ```
+
+Bij **één** config start de app direct. Bij **meerdere** verschijnt een keuzevenster.
 
 ---
 
 ## MIDI
 
-Werkt via [`@julusian/midi`](https://www.npmjs.com/package/@julusian/midi) —
-heeft prebuilds voor Windows en Linux, geen compileren nodig.
+Werkt via [`@julusian/midi`](https://www.npmjs.com/package/@julusian/midi) — prebuilds voor Windows en Linux, geen compileren nodig.
 
-Elk venster heeft volledig onafhankelijke MIDI-poorten. De statuspil in de toolbar
-toont het laatste ontvangen MIDI-bericht (noot, velocity, kanaal of CC-waarde).
+Elk venster heeft volledig onafhankelijke MIDI-poorten. De statusregel in het paneel toont het laatste ontvangen MIDI-bericht (noot, velocity of CC-waarde).
 
 ---
 
@@ -152,8 +190,17 @@ toont het laatste ontvangen MIDI-bericht (noot, velocity, kanaal of CC-waarde).
 
 | Probleem | Oplossing |
 |----------|-----------|
-| `node` niet gevonden | Installeer [Node.js LTS](https://nodejs.org) |
-| Geen audio apparaten | Sta microfoontoegang toe in OS-instellingen |
-| MIDI poorten leeg | Sluit andere MIDI-software die de poorten bezet houdt |
-| Wayland: vensters openen niet | Voeg `--ozone-platform=x11` toe aan `start.sh` |
-| SSL fout op router/NAS | Privé IP-adressen (192.168.x.x, 10.x.x.x) worden automatisch geaccepteerd |
+| Geen config gevonden | Zet `config.json` in dezelfde map als de exe |
+| Geen audio-apparaten in lijst | Sta microfoontoegang toe in OS-instellingen |
+| Audio wisselt niet | Klik op **TOEPASSEN** na selectie; sommige apps vereisen herstarten |
+| MIDI-poorten leeg | Sluit andere software die de MIDI-poorten bezet houdt |
+| MIDI-fout bij selectie | Sommige virtuele MIDI-apparaten zijn niet compatibel met RtMidi; kies een andere poort |
+| SSL-fout op lokale pagina | Privé IP-adressen worden automatisch geaccepteerd; publieke domeinen niet |
+| Wayland: vensters openen niet | Start met `--ozone-platform=x11` of stel `ELECTRON_OZONE_PLATFORM_HINT=x11` in |
+
+---
+
+## Licentie
+
+GPL-2.0-or-later — zie [LICENSE](LICENSE)  
+Auteur: PE5JW
