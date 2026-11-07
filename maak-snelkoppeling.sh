@@ -2,9 +2,9 @@
 # Maakt een .desktop snelkoppeling aan op het bureaublad en in het app-menu
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DESKTOP_FILE="$HOME/Desktop/electron-multiwindow.desktop"
+DESKTOP_FILE="$HOME/Desktop/bolt-multiwindow.desktop"
 APPS_DIR="$HOME/.local/share/applications"
-APP_FILE="$APPS_DIR/electron-multiwindow.desktop"
+APP_FILE="$APPS_DIR/bolt-multiwindow.desktop"
 ICON="$SCRIPT_DIR/assets/icon.png"
 
 # Fallback icon als eigen icon ontbreekt
@@ -13,7 +13,7 @@ if [ ! -f "$ICON" ]; then
 fi
 
 CONTENT="[Desktop Entry]
-Name=Electron MultiWindow
+Name=Bolt-MultiWindow
 Comment=Multi-venster app met audio en MIDI
 Exec=bash $SCRIPT_DIR/start.sh
 Icon=$ICON

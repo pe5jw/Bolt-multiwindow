@@ -2,7 +2,7 @@
 :: Maakt een snelkoppeling aan op het bureaublad die start.bat aanroept
 cd /d "%~dp0"
 set APP_DIR=%~dp0
-set SHORTCUT=%USERPROFILE%\Desktop\Electron MultiWindow.lnk
+set SHORTCUT=%USERPROFILE%\Desktop\Bolt-MultiWindow.lnk
 set START_BAT=%APP_DIR%start.bat
 
 :: Schrijf tijdelijk VBScript
@@ -13,7 +13,7 @@ echo sLinkFile = "%SHORTCUT%"
 echo Set oLink = oWS.CreateShortcut(sLinkFile^)
 echo oLink.TargetPath = "%START_BAT%"
 echo oLink.WorkingDirectory = "%APP_DIR%"
-echo oLink.Description = "Electron Multi-Window App"
+echo oLink.Description = "Bolt-MultiWindow"
 echo oLink.IconLocation = "%APP_DIR%assets\icon.ico,0"
 echo oLink.Save
 ) > "%VBS%"
